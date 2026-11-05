@@ -1,0 +1,136 @@
+{
+  "summary": {
+    "lightgbm_all_features": {
+      "pr_auc": 0.9846958891165629,
+      "roc_auc": 0.9997018810926945,
+      "lift": 169.04264768309773
+    },
+    "lightgbm_tuned_bagged": {
+      "pr_auc": 0.985755298381853,
+      "roc_auc": 0.9997967064027241,
+      "lift": 169.22451636881482
+    },
+    "logistic_regression": {
+      "pr_auc": 0.5772781656258607,
+      "roc_auc": 0.9648871895807893,
+      "lift": 99.10128664656764
+    },
+    "blend_lgbm_lr": {
+      "pr_auc": 0.985755298381853,
+      "roc_auc": 0.9997967064027241,
+      "lift": 169.22451636881482
+    },
+    "holdout_bagged_lgbm": {
+      "pr_auc": 0.9751043098168065,
+      "roc_auc": 0.99954354590555,
+      "lift": 252.62656967230112
+    }
+  },
+  "kept_features": [
+    "transaction_amount",
+    "amount_deviation_score",
+    "amt_to_prior_mean",
+    "prior_txn_count",
+    "distance_from_home_km",
+    "is_first_txn",
+    "time_since_last_txn_hrs",
+    "geo_velocity_proxy",
+    "dist_from_prev_txn_km",
+    "merchant_velocity_kmh",
+    "txn_count_1h",
+    "amt_sum_1h",
+    "txn_count_24h",
+    "amt_sum_24h",
+    "hour",
+    "day_of_week",
+    "is_night",
+    "age",
+    "log_city_pop",
+    "category_entertainment",
+    "category_food_dining",
+    "category_gas_transport",
+    "category_grocery_net",
+    "category_grocery_pos",
+    "category_health_fitness",
+    "category_home",
+    "category_kids_pets",
+    "category_misc_net",
+    "category_misc_pos",
+    "category_personal_care",
+    "category_shopping_net",
+    "category_shopping_pos",
+    "category_travel",
+    "gender_F",
+    "gender_M"
+  ],
+  "best_params": {
+    "num_leaves": 31.0,
+    "min_child_samples": 500.0,
+    "colsample_bytree": 0.4,
+    "subsample": 1.0,
+    "reg_lambda": 50.0
+  },
+  "blend_weight_lr": 0.0,
+  "cost_table": [
+    {
+      "R": 1,
+      "theory_thr(1/(1+R))": 0.5,
+      "best_thr": 0.17391722647201782,
+      "alerts_per_1000": 5.850839580055732,
+      "precision": 0.9569420035149385,
+      "recall": 0.9611650485436893,
+      "false_positive_rate": 0.00025340152764920953,
+      "saving_vs_best_trivial_policy": 0.9179170344218888
+    },
+    {
+      "R": 5,
+      "theory_thr(1/(1+R))": 0.16666666666666666,
+      "best_thr": 0.09536919532226835,
+      "alerts_per_1000": 6.0667756629751874,
+      "precision": 0.9296610169491526,
+      "recall": 0.9682259488084731,
+      "false_positive_rate": 0.0004292311590792733,
+      "saving_vs_best_trivial_policy": 0.9535745807590468
+    },
+    {
+      "R": 10,
+      "theory_thr(1/(1+R))": 0.09090909090909091,
+      "best_thr": 0.05142167543767926,
+      "alerts_per_1000": 6.411245128584796,
+      "precision": 0.8853247794707297,
+      "recall": 0.9744042365401588,
+      "false_positive_rate": 0.0007395187439558564,
+      "saving_vs_best_trivial_policy": 0.9617828773168579
+    },
+    {
+      "R": 20,
+      "theory_thr(1/(1+R))": 0.047619047619047616,
+      "best_thr": 0.04150307181207953,
+      "alerts_per_1000": 6.601474534966221,
+      "precision": 0.8613707165109035,
+      "recall": 0.9761694616063548,
+      "false_positive_rate": 0.0009205198351338633,
+      "saving_vs_best_trivial_policy": 0.9683142100617829
+    },
+    {
+      "R": 50,
+      "theory_thr(1/(1+R))": 0.0196078431372549,
+      "best_thr": 0.011968253052439154,
+      "alerts_per_1000": 8.210712486246928,
+      "precision": 0.6988102692548529,
+      "recall": 0.9849955869373345,
+      "false_positive_rate": 0.002487472138760608,
+      "saving_vs_best_trivial_policy": 0.9765048543689321
+    },
+    {
+      "R": 100,
+      "theory_thr(1/(1+R))": 0.009900990099009901,
+      "best_thr": 0.004507759247750491,
+      "alerts_per_1000": 10.796804145972791,
+      "precision": 0.5338095238095238,
+      "recall": 0.9894086496028244,
+      "false_positive_rate": 0.005062859093236248,
+      "saving_vs_best_trivial_policy": 0.9807678729037952
+    }
+  ]
+}

@@ -1,0 +1,69 @@
+train (1102173, 86) | val (194502, 86) | base rate 0.5825% (random PR-AUC = 0.0058)
+
+===== A. ABLATION (drop one group of one-hot columns) =====
+all 86 features: PR-AUC 0.9847 | ROC-AUC 0.9997 | iters 1705
+  without state              (51 cols): PR-AUC 0.9851  delta vs all: +0.0006 [95% CI -0.0005, +0.0016] -> noise (CI contains 0)
+  without category           (14 cols): PR-AUC 0.9326  delta vs all: -0.0525 [95% CI -0.0601, -0.0442] -> REAL
+  without gender             ( 2 cols): PR-AUC 0.9836  delta vs all: -0.0011 [95% CI -0.0021, -0.0003] -> REAL
+-> keeping 35 features (dropped groups whose removal did not lower PR-AUC by > 0.0005)
+
+===== B. RANDOM SEARCH =====
+default config on kept features: PR-AUC 0.9851
+  trial 1/8: PR-AUC 0.9854  {'num_leaves': 31, 'min_child_samples': 500, 'colsample_bytree': 0.4, 'subsample': 1.0, 'reg_lambda': 50.0}
+  trial 2/8: PR-AUC 0.9852  {'num_leaves': 63, 'min_child_samples': 1000, 'colsample_bytree': 0.4, 'subsample': 1.0, 'reg_lambda': 10.0}
+  trial 3/8: PR-AUC 0.9824  {'num_leaves': 31, 'min_child_samples': 200, 'colsample_bytree': 0.7, 'subsample': 0.6, 'reg_lambda': 100.0}
+  trial 4/8: PR-AUC 0.9842  {'num_leaves': 63, 'min_child_samples': 200, 'colsample_bytree': 0.5, 'subsample': 0.6, 'reg_lambda': 10.0}
+  trial 5/8: PR-AUC 0.9850  {'num_leaves': 63, 'min_child_samples': 500, 'colsample_bytree': 0.5, 'subsample': 0.8, 'reg_lambda': 10.0}
+  trial 6/8: PR-AUC 0.9812  {'num_leaves': 63, 'min_child_samples': 500, 'colsample_bytree': 0.4, 'subsample': 0.6, 'reg_lambda': 100.0}
+  trial 7/8: PR-AUC 0.9853  {'num_leaves': 15, 'min_child_samples': 1000, 'colsample_bytree': 0.9, 'subsample': 0.6, 'reg_lambda': 1.0}
+  trial 8/8: PR-AUC 0.9834  {'num_leaves': 31, 'min_child_samples': 200, 'colsample_bytree': 0.7, 'subsample': 0.8, 'reg_lambda': 100.0}
+-> best params: {'num_leaves': 31, 'min_child_samples': 500, 'colsample_bytree': 0.4, 'subsample': 1.0, 'reg_lambda': 50.0} (PR-AUC 0.9854)
+
+===== C. SEED BAGGING =====
+  seed 42: PR-AUC 0.9855 (iters 2711)
+  seed 43: PR-AUC 0.9859 (iters 2882)
+  seed 44: PR-AUC 0.9854 (iters 3094)
+bagged LightGBM: PR-AUC 0.9858 | ROC-AUC 0.9998
+
+===== D. LOGISTIC REGRESSION BLEND =====
+logistic regression: PR-AUC 0.5773
+best weight on LR = 0.0 -> blend PR-AUC 0.9858
+saved bagged LightGBM + LR -> models/train_models_bundle.joblib, model_metadata.json
+
+===== COMPARISON (reference = LightGBM, all features, default params) =====
+  lightgbm_all_features    PR-AUC 0.9847 | ROC-AUC 0.9997 | lift 169.04x
+  lightgbm_tuned_bagged    PR-AUC 0.9858 | ROC-AUC 0.9998 | lift 169.22x | vs reference: +0.0012 [95% CI -0.0001, +0.0022] -> noise (CI contains 0)
+  logistic_regression      PR-AUC 0.5773 | ROC-AUC 0.9649 | lift 99.10x | vs reference: -0.4079 [95% CI -0.4386, -0.3712] -> REAL
+  blend_lgbm_lr            PR-AUC 0.9858 | ROC-AUC 0.9998 | lift 169.22x | vs reference: +0.0012 [95% CI -0.0001, +0.0022] -> noise (CI contains 0)
+
+===== E. CALIBRATION of bagged LightGBM (rank-bucket table; deciles are useless at a 0.58% base rate) =====
+              n  mean_pred  actual_rate
+d                                      
+0-50%     97251     0.0000       0.0000
+50-90%    77800     0.0000       0.0000
+90-99%    17505     0.0004       0.0008
+99-99.5%    973     0.1022       0.1531
+top0.5%     973     0.9793       0.9969
+top-0.5% lift = 171.14x | bottom-50% = 0.00x
+
+===== F. COST-BASED OPERATING POINT (bagged LightGBM) =====
+cost = false_alerts*1 + missed_frauds*R ; R = how many times worse a missed fraud is than a false alert
+saving is measured against the best trivial policy (flag nobody, or flag everybody when R > (1-base)/base)
+  R  theory_thr(1/(1+R))  best_thr  alerts_per_1000  precision  recall  false_positive_rate  saving_vs_best_trivial_policy
+  1               0.5000    0.1739           5.8508     0.9569  0.9612               0.0003                         0.9179
+  5               0.1667    0.0954           6.0668     0.9297  0.9682               0.0004                         0.9536
+ 10               0.0909    0.0514           6.4112     0.8853  0.9744               0.0007                         0.9618
+ 20               0.0476    0.0415           6.6015     0.8614  0.9762               0.0009                         0.9683
+ 50               0.0196    0.0120           8.2107     0.6988  0.9850               0.0025                         0.9765
+100               0.0099    0.0045          10.7968     0.5338  0.9894               0.0051                         0.9808
+(if best_thr is far from theory_thr the probabilities are not well calibrated - see section E)
+
+===== G. FINAL HOLDOUT (database_ready.csv - never used for tuning / early stopping / thresholds) =====
+holdout: n 555,719 | base rate 0.3860% | PR-AUC 0.9751 | ROC-AUC 0.9995
+thresholds were chosen on VALIDATION and are applied as-is:
+  R=1    thr 0.1739: alerts/1000 3.77 | precision 0.9475 | recall 0.9263
+  R=5    thr 0.0954: alerts/1000 4.03 | precision 0.9066 | recall 0.9459
+  R=10   thr 0.0514: alerts/1000 4.36 | precision 0.8474 | recall 0.9580
+  R=20   thr 0.0415: alerts/1000 4.47 | precision 0.8288 | recall 0.9594
+  R=50   thr 0.0120: alerts/1000 5.88 | precision 0.6410 | recall 0.9762
+  R=100  thr 0.0045: alerts/1000 8.12 | precision 0.4679 | recall 0.9846

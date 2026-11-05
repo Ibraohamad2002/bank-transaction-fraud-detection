@@ -1,0 +1,135 @@
+train (1102173, 31) | val (194502, 31) | holdout (555719, 31) | supervised features 31 | anomaly features 14
+routing: STEP-UP >= 0.0476 (R=20) | BLOCK >= 0.5000 (R=1) | fusion: A0=0.999, LAMBDA=0.3
+
+===== ENGINE 1: SUPERVISED (LightGBM + Platt) =====
+blackeye-hybrid-20261102-37a0257f | trees 2635
+val     PR-AUC 0.9761 | ROC-AUC 0.9997
+holdout PR-AUC 0.9598 | ROC-AUC 0.9994
+
+===== ENGINE 2: UNSUPERVISED (IsolationForest, labels never used) =====
+unsupervised alone, holdout: PR-AUC 0.3651 (base rate 0.0039) | ROC-AUC 0.9513
+  top 1.0% most anomalous: 6,112 txns | fraud rate 19.29% | catches 55.0% of all fraud
+  top 0.1% most anomalous: 409 txns | fraud rate 84.11% | catches 16.0% of all fraud
+rank-correlation-like overlap with supervised score (Pearson on values): 0.103  (low = complementary)
+
+===== FUSION TRADE-OFF: what the anomaly engine adds on top of supervised (extra alerts vs extra frauds) =====
+(in-distribution this is expected to be small; its real value is the zero-day simulation below)
+       set     A0  extra_alerts  extra_frauds  incr_precision  alerts/1000  precision  recall
+validation 0.9900           747             7          0.0094      11.7377     0.4853  0.9779
+validation 0.9950           265             2          0.0075       9.2595     0.6124  0.9735
+validation 0.9980            34             0          0.0000       8.0719     0.7013  0.9718
+validation 0.9990             5             0          0.0000       7.9228     0.7145  0.9718
+validation 0.9995             0             0             NaN       7.8971     0.7168  0.9718
+   holdout 0.9900          3696             7          0.0019      12.2958     0.3029  0.9650
+   holdout 0.9950          1291             3          0.0023       7.9681     0.4666  0.9632
+   holdout 0.9980           244             0          0.0000       6.0840     0.6102  0.9618
+   holdout 0.9990            34             0          0.0000       5.7061     0.6506  0.9618
+   holdout 0.9995             5             0          0.0000       5.6539     0.6566  0.9618
+artifacts saved -> models, blackeye_v2  (blackeye-hybrid-20261102-37a0257f)
+
+===== HOLDOUT: supervised only vs FUSED (current A0) =====
+  supervised only  PR-AUC 0.9598 | alerts/1000 5.64 | precision 0.6576 | recall 0.9618 | BLOCK/1000 3.60 (precision 0.9431, recall 0.8807)
+  fused (hybrid)   PR-AUC 0.9595 | alerts/1000 5.71 | precision 0.6506 | recall 0.9618 | BLOCK/1000 3.61 (precision 0.9431, recall 0.8816)
+  decisions changed by the anomaly engine: 36 of 555,719 (frauds among them: 2)
+
+===== ZERO-DAY SIMULATION (a fraud typology is REMOVED from training; test only on that typology in the holdout) =====
+a typology = fraud inside one merchant category; its legit rows stay in training (worst case: model learns 'this category is clean')
+-- typology 'shopping_net': removed 1463 train frauds | holdout rows 41,779 with 506 frauds
+   reference (model saw this typology)  recall 0.986 | alerts/1000 in category   16.92 | precision 0.706 | PR-AUC 0.9834
+   supervised, typology unseen          recall 0.757 | alerts/1000 in category    9.29 | precision 0.987 | PR-AUC 0.9701
+   anomaly engine alone (a >= A0)       recall 0.360 | alerts/1000 in category    4.74 | precision 0.919 | PR-AUC 0.3384
+   FUSED, typology unseen               recall 0.757 | alerts/1000 in category    9.60 | precision 0.955 | PR-AUC 0.9588
+-- typology 'grocery_pos': removed 1482 train frauds | holdout rows 52,553 with 485 frauds
+   reference (model saw this typology)  recall 0.998 | alerts/1000 in category    9.53 | precision 0.966 | PR-AUC 0.9994
+   supervised, typology unseen          recall 0.330 | alerts/1000 in category    3.06 | precision 0.994 | PR-AUC 0.7714
+   anomaly engine alone (a >= A0)       recall 0.019 | alerts/1000 in category    0.21 | precision 0.818 | PR-AUC 0.0242
+   FUSED, typology unseen               recall 0.330 | alerts/1000 in category    3.08 | precision 0.988 | PR-AUC 0.7692
+-- typology 'misc_net': removed 778 train frauds | holdout rows 27,367 with 267 frauds
+   reference (model saw this typology)  recall 0.974 | alerts/1000 in category   13.99 | precision 0.679 | PR-AUC 0.9707
+   supervised, typology unseen          recall 0.779 | alerts/1000 in category    7.78 | precision 0.977 | PR-AUC 0.9479
+   anomaly engine alone (a >= A0)       recall 0.292 | alerts/1000 in category    3.07 | precision 0.929 | PR-AUC 0.2782
+   FUSED, typology unseen               recall 0.783 | alerts/1000 in category    7.93 | precision 0.963 | PR-AUC 0.9452
+
+===== AUDIT TRAIL (hash-chained JSONL, both engines' reasons) =====
+186 decisions logged -> blackeye_v2/decisions.jsonl | chain verification: PASS
+example anomaly-driven decision:
+{
+ "route": "STEP-UP",
+ "risk_score": 7.91,
+ "decision_driver": "anomaly_override",
+ "engine_supervised": {
+  "p_calibrated": 6.7e-05,
+  "route_if_alone": "APPROVE",
+  "top_reasons": [
+   {
+    "feature": "amt_sum_24h",
+    "label": "Spend in last 24h",
+    "value": 1023.42,
+    "impact_logodds": 2.5042,
+    "direction": "increases_risk",
+    "share_of_total_impact": 0.213
+   },
+   {
+    "feature": "txn_count_24h",
+    "label": "Txns in last 24h",
+    "value": 16.0,
+    "impact_logodds": -2.3021,
+    "direction": "decreases_risk",
+    "share_of_total_impact": 0.1958
+   },
+   {
+    "feature": "txn_count_1h",
+    "label": "Txns in last 1h",
+    "value": 3.0,
+    "impact_logodds": 1.0837,
+    "direction": "increases_risk",
+    "share_of_total_impact": 0.0922
+   },
+   {
+    "feature": "is_night",
+    "label": "Night-time txn (22-03h)",
+    "value": 1.0,
+    "impact_logodds": 1.0393,
+    "direction": "increases_risk",
+    "share_of_total_impact": 0.0884
+   },
+   {
+    "feature": "hour",
+    "label": "Hour of day",
+    "value": 23.0,
+    "impact_logodds": 0.9277,
+    "direction": "increases_risk",
+    "share_of_total_impact": 0.0789
+   }
+  ]
+ },
+ "engine_anomaly": {
+  "percentile_vs_train": 0.999263,
+  "gate_A0": 0.999,
+  "boost_active": true,
+  "rarest_features": [
+   {
+    "feature": "geo_velocity_proxy",
+    "label": "Geo-velocity proxy",
+    "value": 29549.7698,
+    "two_sided_tail_probability_vs_train": 0.00056
+   },
+   {
+    "feature": "time_since_last_txn_hrs",
+    "label": "Hours since previous txn",
+    "value": 0.0033,
+    "two_sided_tail_probability_vs_train": 0.001193
+   },
+   {
+    "feature": "merchant_velocity_kmh",
+    "label": "Travel speed between txns (km/h)",
+    "value": 5000.0,
+    "two_sided_tail_probability_vs_train": 0.002183
+   }
+  ]
+ }
+}
+(that transaction is_fraud = 0)
+
+===== LATENCY (single txn, both engines + SHAP + record; excludes feature computation) =====
+p50 16.73 ms | p95 18.16 ms | p99 18.83 ms | target < 100 ms

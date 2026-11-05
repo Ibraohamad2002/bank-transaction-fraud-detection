@@ -1,0 +1,81 @@
+{
+  "model_version": "blackeye-hybrid-20261102-37a0257f",
+  "supervised_sha256": "37a0257fe12213b86ed645e9f3e5a5eb5d4aa9f2f4ef7b0e733b6b208f574b98",
+  "features": [
+    "transaction_amount",
+    "amount_deviation_score",
+    "amt_to_prior_mean",
+    "distance_from_home_km",
+    "is_first_txn",
+    "time_since_last_txn_hrs",
+    "geo_velocity_proxy",
+    "dist_from_prev_txn_km",
+    "merchant_velocity_kmh",
+    "txn_count_1h",
+    "amt_sum_1h",
+    "txn_count_24h",
+    "amt_sum_24h",
+    "hour",
+    "day_of_week",
+    "is_night",
+    "log_city_pop",
+    "category_entertainment",
+    "category_food_dining",
+    "category_gas_transport",
+    "category_grocery_net",
+    "category_grocery_pos",
+    "category_health_fitness",
+    "category_home",
+    "category_kids_pets",
+    "category_misc_net",
+    "category_misc_pos",
+    "category_personal_care",
+    "category_shopping_net",
+    "category_shopping_pos",
+    "category_travel"
+  ],
+  "anomaly_features": [
+    "transaction_amount",
+    "amount_deviation_score",
+    "amt_to_prior_mean",
+    "distance_from_home_km",
+    "time_since_last_txn_hrs",
+    "geo_velocity_proxy",
+    "dist_from_prev_txn_km",
+    "merchant_velocity_kmh",
+    "txn_count_1h",
+    "amt_sum_1h",
+    "txn_count_24h",
+    "amt_sum_24h",
+    "hour",
+    "is_night"
+  ],
+  "excluded_features": [
+    "age",
+    "gender_",
+    "prior_txn_count"
+  ],
+  "trees": 2635,
+  "fusion": {
+    "formula": "risk = 1-(1-p_sup)*(1-LAMBDA*clip((a-A0)/(1-A0),0,1))",
+    "A0": 0.999,
+    "LAMBDA": 0.3,
+    "note": "LAMBDA < T_BLOCK: anomaly engine alone can only trigger STEP-UP"
+  },
+  "routing": {
+    "STEP-UP": ">= 0.047619 (R=20)",
+    "BLOCK": ">= 0.500000 (R=1)"
+  },
+  "holdout": {
+    "supervised_pr_auc": 0.9598380662058771,
+    "fused_pr_auc": 0.9595129661495919,
+    "anomaly_alone_pr_auc": 0.36512812051981913,
+    "base_rate": 0.0038598644278853163,
+    "n": 555719
+  },
+  "limitations": [
+    "Synthetic (Sparkov) data - do not quote accuracy as production performance",
+    "Zero-day simulation uses merchant categories as proxy typologies",
+    "Re-fit Platt, A0, LAMBDA and thresholds on production-like data before go-live"
+  ]
+}
