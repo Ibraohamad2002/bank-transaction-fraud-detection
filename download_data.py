@@ -1,13 +1,22 @@
-import subprocess
 import os
+import subprocess
 
 os.makedirs("data", exist_ok=True)
 
-subprocess.run([
-    "python", "-m", "kaggle",
-    "datasets", "download",
-    "-d", "nafiulislam490/bank-transaction-fraud-detection-dataset",
-    "-p", "data"
-], check=True)
+subprocess.run(
+    [
+        "python",
+        "-m",
+        "kaggle",
+        "datasets",
+        "download",
+        "-d",
+        "kartik2112/fraud-detection",
+        "-p",
+        "data",
+        "--unzip",
+    ],
+    check=True,
+)
 
 print("Dataset downloaded successfully!")
