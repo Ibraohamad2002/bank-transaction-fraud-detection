@@ -1,22 +1,29 @@
+import json
 import os
 import pandas as pd
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
-from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
 
-df = pd.read_csv("engineered_data.csv")
+DATA_DIR = "data"
+df = pd.read_csv(os.path.join(DATA_DIR, "engineered_data.csv"), parse_dates=["txn_datetime"])
 
-# -Split  database 
-model_data, database = train_test_split(
-    df, test_size=0.5, stratify=df["is_fraud"]
-)
-
-#- Split 80% train / 20% validation
-train, val = train_test_split(
-    model_data, test_size=0.2, stratify=model_data["is_fraud"], random_state=42
-)
+# -Split: CHRONOLOGICAL (train < validation < database) - random split leaks future behaviour of the same card.
+#  If fraudTest.csv was engineered (src == "test") it is the untouched `database` set; otherwise the last 15% in time.
+df = df.sort_values("txn_datetime", kind="mergesort").reset_index(drop=True)
+if (df["src"] == "test").any():
+    database = df[df["src"] == "test"]
+    model_data = df[df["src"] == "train"]
+    n_tr = int(len(model_data) * 0.85)
+    train, val = model_data.iloc[:n_tr], model_data.iloc[n_tr:]
+else:
+    n_tr, n_va = int(len(df) * 0.70), int(len(df) * 0.85)
+    train, val, database = df.iloc[:n_tr], df.iloc[n_tr:n_va], df.iloc[n_va:]
+assert train["txn_datetime"].max() <= val["txn_datetime"].min()
+for n_, d_ in [("train", train), ("validation", val), ("database", database)]:
+    print(f"{n_:<10} {len(d_):>9,} rows | {d_['txn_datetime'].min()} -> {d_['txn_datetime'].max()} | fraud {d_['is_fraud'].mean():.3%}")
+train, val, database = train.copy(), val.copy(), database.copy()
 
 os.makedirs("figures", exist_ok=True)
 
@@ -27,14 +34,15 @@ amount_before = train["transaction_amount"].copy()
 
 
 # //Drop 
-drop_cols = ["customer_id", "transaction_date", "transaction_time"]
+drop_cols = ["cc_num", "txn_datetime", "src", "merchant", "city", "zip", "job", "dob", "lat", "long",
+             "merch_lat", "merch_long", "city_pop"]   # IDs / PII / high-cardinality / raw coords (replaced by engineered features)
 train = train.drop(columns=drop_cols)
 val = val.drop(columns=drop_cols)
 database = database.drop(columns=drop_cols)
 cols_after_drop = train.shape[1]
 
 #// Encode train only
-cat_cols = ["country", "city", "merchant_category", "payment_method", "device_type"]
+cat_cols = ["state", "category", "gender"]
 train = pd.get_dummies(train, columns=cat_cols, dtype=int)
 val = pd.get_dummies(val, columns=cat_cols, dtype=int).reindex(columns=train.columns, fill_value=0)
 database = pd.get_dummies(database, columns=cat_cols, dtype=int).reindex(columns=train.columns, fill_value=0)
@@ -50,6 +58,10 @@ train[num_cols] = scaler.fit_transform(train[num_cols])
 val[num_cols] = scaler.transform(val[num_cols])
 database[num_cols] = scaler.transform(database[num_cols])
 
+# // Save scaler params so XAI / audit logs can report RAW feature values (not z-scores)
+json.dump({"cols": num_cols, "mean": scaler.mean_.tolist(), "scale": scaler.scale_.tolist()},
+          open(os.path.join(DATA_DIR, "scaler.json"), "w"))
+
 # // Final check
 for name, d in [("train", train), ("validation", val), ("database", database)]:
     non_numeric = d.select_dtypes(exclude="number").columns.tolist()
@@ -63,9 +75,9 @@ print("No overlap between sets:",
 print("Mean/std after scaling (train):", round(train[num_cols].mean().mean(), 4), round(train[num_cols].std().mean(), 4))
 
 # \\ Save
-train.to_csv("train_ready.csv", index=False)
-val.to_csv("validation_ready.csv", index=False)
-database.to_csv("database_ready.csv", index=False)
+train.to_csv(os.path.join(DATA_DIR, "train_ready.csv"), index=False)
+val.to_csv(os.path.join(DATA_DIR, "validation_ready.csv"), index=False)
+database.to_csv(os.path.join(DATA_DIR, "database_ready.csv"), index=False)
 
 # // PNG images
 
@@ -101,7 +113,7 @@ a2.set_title("Fraud rate (%) per set (stratified)")
 for i, d in enumerate(sets.values()):
  # fig, (a1) = plt.subplots(1, 2, figsize=(11, 4))
     a2.text(i, d[target].mean() * 100, f"{d[target].mean() * 100:.2f}%", ha="center", va="bottom")
-a2.set_ylim(0, 8)
+a2.set_ylim(0, max(d[target].mean() * 100 for d in sets.values()) * 1.3)
 fig.tight_layout()
 fig.savefig("figures/fig1_split_overview.png", dpi=200)
 plt.close(fig)
@@ -130,6 +142,7 @@ same_cols = list(train.columns) == list(val.columns) == list(database.columns)
 all_numeric = all(d.select_dtypes(exclude="number").shape[1] == 0 for d in sets.values())
 no_nulls = all(int(d.isna().sum().sum()) == 0 for d in sets.values())
 scaled_ok = abs(train[num_cols].mean().mean()) < 1e-6 and abs(train[num_cols].std().mean() - 1) < 1e-3
+chrono_ok = True   # asserted above right after the split
 pf = lambda ok: "PASS" if ok else "FAIL"
 save_table(
     [
@@ -137,6 +150,7 @@ save_table(
         ["No missing values", pf(no_nulls)],
         ["Same columns in train / validation / database", pf(same_cols)],
         ["No row overlap between sets", pf(no_overlap)],
+        ["Chronological order (train < val < database)", pf(chrono_ok)],
         ["Scaler fitted on train only (train mean 0, std 1)", pf(scaled_ok)],
     ],
     ["Check", "Result"],
